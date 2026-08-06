@@ -11,6 +11,7 @@ import {
   NearestFilter,
   PointLight,
   SphereGeometry,
+  SpotLight,
   Vector3,
 } from 'three'
 import { useStore } from '../state/store'
@@ -102,6 +103,24 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
     const roomD = (roomBox.max.z - roomBox.min.z) * SHELL_COVER
     const lights: PointLight[] = []
     scene.traverse((obj) => {
+      if (obj instanceof SpotLight) {
+        // Authored ceiling/fixture spotlights: same energy conversion as the
+        // point lamps, aimed straight down (the target rides the fixture so
+        // it stays correct wherever the model puts it).
+        obj.userData.rawIntensity ??= obj.intensity
+        obj.scale.setScalar(1)
+        obj.decay = 1.4
+        obj.intensity = (obj.userData.rawIntensity as number) * unitScale * SPOT_BOOST
+        obj.angle = 0.65
+        obj.penumbra = 0.5
+        obj.target.position.set(0, -1 / unitScale, 0)
+        obj.add(obj.target)
+        obj.castShadow = true
+        obj.shadow.mapSize.set(512, 512)
+        obj.shadow.camera.near = 0.1
+        obj.shadow.normalBias = 0.05
+        return
+      }
       if (obj instanceof PointLight) {
         obj.userData.rawIntensity ??= obj.intensity
         // FBX exports carry the lamp's editor size as a transform scale;
@@ -150,6 +169,13 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
         if (mat.specular) mat.specular.setScalar(0)
         // PSX consoles had no texture filtering.
         if (mat.map) mat.map.magFilter = NearestFilter
+        // Alpha textures arrive as blended, which renders cutouts (posters,
+        // the standees) ghostly and z-fighty; alpha-tested is crisp.
+        if (mat.transparent) {
+          mat.transparent = false
+          mat.alphaTest = 0.5
+          mat.depthWrite = true
+        }
         setSnapDefine(mat, useStore.getState().psx)
       }
     })
@@ -197,6 +223,9 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
 // Kept below the range where AgX starts bleaching the lamp color to white —
 // brightness comes from toneMappingExposure instead.
 const LAMP_BOOST = 5
+// Spot cones concentrate their energy; they read dimmer than point lamps at
+// the same wattage, so they get a bigger conversion factor.
+const SPOT_BOOST = 15
 
 // Thresholds for guessing which meshes should block movement when the model
 // has no explicit col_* boxes.
@@ -232,6 +261,9 @@ function deriveColliders(scene: Group): AABB[] {
     if (coversRoom) return // walls/floor/ceiling — the perimeter boxes handle it
     if (b.max.y - b.min.y < MIN_PROP_HEIGHT) return
     if (b.min.y > WALK_UNDER) return
+    // Cords and curve objects span huge boxes of mostly empty space — a
+    // cable across the room must not become a wall.
+    if (/nurbs|bezier|curve|cord|cable|wire|rope|path/i.test(obj.name)) return
     candidates.push({ box: b, aabb })
   })
 
