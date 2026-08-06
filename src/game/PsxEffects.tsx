@@ -95,6 +95,9 @@ const PsxDitherShader = {
 
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
+      // Push saturation before quantizing; AgX leaves the palette muted.
+      float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb = clamp(vec3(luma) + (c.rgb - vec3(luma)) * 1.2, 0.0, 1.0);
       float d = bayer2(0.5 * gl_FragCoord.xy) * 0.25 + bayer2(gl_FragCoord.xy);
       c.rgb = floor(c.rgb * uLevels + d) / uLevels;
       gl_FragColor = c;

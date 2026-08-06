@@ -122,6 +122,18 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
       }
       if (obj instanceof PointLight) {
         obj.userData.rawIntensity ??= obj.intensity
+        // Hanging pendants are authored with the bulb at the shade's narrow
+        // apex, where it pokes through and spills light at the ceiling.
+        // Sink lights in the pendant band into the wide part of the shade
+        // so the cone shadows the top and throws everything downward.
+        obj.userData.rawY ??= obj.position.y
+        obj.position.y = obj.userData.rawY as number
+        const probe = new Vector3()
+        obj.getWorldPosition(probe)
+        if (probe.y > 2 && probe.y < 2.7) {
+          obj.getWorldScale(probe)
+          obj.position.y -= 0.22 / (probe.y || 1)
+        }
         // FBX exports carry the lamp's editor size as a transform scale;
         // three ignores it for lighting, but anything parented to the light
         // (our bulb) would inherit it — and its bounding box would inflate
@@ -152,12 +164,26 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
       }
       if (!(obj instanceof Mesh)) return
       if (obj.name === 'lampBulb') return
+      // FBXLoader can deliver a material array with no geometry groups
+      // (every polygon uses the same material) — three draws nothing for a
+      // group-less array, leaving invisible walls. Collapse to the one
+      // material actually in use.
+      if (Array.isArray(obj.material) && obj.geometry.groups.length === 0) {
+        obj.material = obj.material[0]!
+      }
       // The room shell is lit on its back faces (normals point outward), so
       // if it casts shadows, the shadow normalBias pushes samples the wrong
-      // way and the whole shell self-shadows into darkness. It has nothing
-      // to cast onto anyway — only receive.
+      // way and the whole shell self-shadows into darkness. The same
+      // applies to standalone full-length wall planes (room-wide in one
+      // axis, paper-thin in the other). They have nothing to cast onto
+      // anyway — only receive.
       const b = new Box3().setFromObject(obj)
-      const isShell = b.max.x - b.min.x > roomW && b.max.z - b.min.z > roomD
+      const spanX = b.max.x - b.min.x
+      const spanZ = b.max.z - b.min.z
+      const isShell =
+        (spanX > roomW && spanZ > roomD) ||
+        (spanX > roomW && spanZ < 0.3) ||
+        (spanZ > roomD && spanX < 0.3)
       obj.castShadow = !isShell
       obj.receiveShadow = true
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
