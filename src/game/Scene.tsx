@@ -3,6 +3,7 @@ import { Suspense, useEffect } from 'react'
 import { AgXToneMapping, PerspectiveCamera } from 'three'
 import { useStore } from '../state/store'
 import { LocalPlayer } from './LocalPlayer'
+import { PeepholeScreen } from './PeepholeScreen'
 import { PostEffects, PsxVertexSnap } from './PsxEffects'
 import { RemoteAvatar } from './RemoteAvatar'
 import { Room } from './Room'
@@ -45,6 +46,7 @@ export function Scene(): React.JSX.Element {
       <CameraFov />
       <PsxVertexSnap />
       <PostEffects />
+      <PeepholeScreen />
       <Suspense fallback={null}>
         <Room />
         <Smoke />

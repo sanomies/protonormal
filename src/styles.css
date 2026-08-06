@@ -247,32 +247,6 @@ canvas {
   image-rendering: pixelated;
 }
 
-/* Front-door peephole video: circular vignette over black, faded in/out. */
-.peephole {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-  opacity: 0;
-  transition: opacity 0.7s ease;
-  pointer-events: none;
-}
-
-.peephole.visible {
-  opacity: 1;
-}
-
-.peephole video {
-  width: min(85vmin, 100%);
-  height: min(85vmin, 100%);
-  border-radius: 50%;
-  object-fit: cover;
-  filter: brightness(0.95);
-  box-shadow: 0 0 120px 40px rgba(0, 0, 0, 0.9) inset;
-}
 
 /* ---- Player list ---- */
 
