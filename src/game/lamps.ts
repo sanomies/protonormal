@@ -27,6 +27,9 @@ interface LampEntry {
   // Mounted fixtures (ceiling/wall lamps) can be toggled but not carried —
   // taking the light while its housing stays on the wall looks broken.
   fixed: boolean
+  // Pure light sources without a bulb visual (Room adds no bulb to
+  // free-floating lights): nothing to see, so nothing to grab or click.
+  ghost: boolean
 }
 
 const GRAVITY = 9.8
@@ -52,7 +55,8 @@ export function setLamps(lights: PointLight[]): void {
   lamps = lights.map((light) => {
     light.getWorldPosition(tmp)
     const fixed = tmp.y > 2 || (light.parent as Mesh | null)?.isMesh === true
-    return { light, remoteTarget: null, fallVel: null, on: true, fixed }
+    const ghost = !light.children.some((c) => c.name === 'lampBulb')
+    return { light, remoteTarget: null, fallVel: null, on: true, fixed, ghost }
   })
   carried = -1
   // Replay state that arrived while the model was still loading. Released
@@ -95,7 +99,7 @@ export function nearestLampWithin(x: number, z: number, radius: number): number 
   let best = -1
   let bestD = radius * radius
   for (let i = 0; i < lamps.length; i++) {
-    if (lamps[i]!.fixed) continue
+    if (lamps[i]!.fixed || lamps[i]!.ghost) continue
     lamps[i]!.light.getWorldPosition(tmp)
     const dx = tmp.x - x
     const dz = tmp.z - z
@@ -119,6 +123,7 @@ export function lampAlongRay(
   let best = -1
   let bestOff = maxOffAxis
   for (let i = 0; i < lamps.length; i++) {
+    if (lamps[i]!.ghost) continue
     lamps[i]!.light.getWorldPosition(tmp)
     toLamp.copy(tmp).sub(origin)
     const along = toLamp.dot(dir)

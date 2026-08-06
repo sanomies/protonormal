@@ -122,18 +122,6 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
       }
       if (obj instanceof PointLight) {
         obj.userData.rawIntensity ??= obj.intensity
-        // Hanging pendants are authored with the bulb at the shade's narrow
-        // apex, where it pokes through and spills light at the ceiling.
-        // Sink lights in the pendant band into the wide part of the shade
-        // so the cone shadows the top and throws everything downward.
-        obj.userData.rawY ??= obj.position.y
-        obj.position.y = obj.userData.rawY as number
-        const probe = new Vector3()
-        obj.getWorldPosition(probe)
-        if (probe.y > 2 && probe.y < 2.7) {
-          obj.getWorldScale(probe)
-          obj.position.y -= 0.22 / (probe.y || 1)
-        }
         // FBX exports carry the lamp's editor size as a transform scale;
         // three ignores it for lighting, but anything parented to the light
         // (our bulb) would inherit it — and its bounding box would inflate
@@ -229,8 +217,14 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
     // scales from their housing meshes, which the light's own scale reset
     // doesn't touch.
     scene.updateMatrixWorld(true)
+    const probe = new Vector3()
     for (const light of lights) {
       if (light.children.some((c) => c.name === 'lampBulb')) continue
+      // Free-floating lights above hand-lamp height are pure light sources
+      // (e.g. an invisible source lighting the table) — no physical bulb.
+      // Fixture-parented lights keep theirs; it's their visible glow point.
+      const parentIsMesh = (light.parent as Mesh | null)?.isMesh === true
+      if (!parentIsMesh && light.getWorldPosition(probe).y > 1.5) continue
       const mat = new MeshBasicMaterial({ color: 0xff7a30 })
       // Exempt from PSX vertex snapping — a bulb-sized mesh collapses into
       // jagged streaks on the coarse snap grid.
