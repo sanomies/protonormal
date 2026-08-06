@@ -114,7 +114,7 @@ export function Smoke(): React.JSX.Element {
     const geometry = new PlaneGeometry(1, 1)
     return Array.from({ length: COUNT }, (_, i) => {
       // Dim tint keeps even lamp-adjacent wisps below the bloom threshold.
-      const baseOpacity = 0.055 + rand(i) * 0.05
+      const baseOpacity = 0.069 + rand(i) * 0.062
       const material = new MeshLambertMaterial({
         color: 0x9a8d82,
         alphaMap: textures[Math.floor(rand(i + 50) * textures.length)]!,
