@@ -102,23 +102,22 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
     const roomW = (roomBox.max.x - roomBox.min.x) * SHELL_COVER
     const roomD = (roomBox.max.z - roomBox.min.z) * SHELL_COVER
     const lights: PointLight[] = []
+    const spots: SpotLight[] = []
     scene.traverse((obj) => {
       if (obj instanceof SpotLight) {
         // Authored ceiling/fixture spotlights: same energy conversion as the
-        // point lamps, aimed straight down (the target rides the fixture so
-        // it stays correct wherever the model puts it).
+        // point lamps.
         obj.userData.rawIntensity ??= obj.intensity
         obj.scale.setScalar(1)
         obj.decay = 1.4
         obj.intensity = (obj.userData.rawIntensity as number) * unitScale * SPOT_BOOST
         obj.angle = 0.65
         obj.penumbra = 0.5
-        obj.target.position.set(0, -1 / unitScale, 0)
-        obj.add(obj.target)
         obj.castShadow = true
         obj.shadow.mapSize.set(512, 512)
         obj.shadow.camera.near = 0.1
         obj.shadow.normalBias = 0.05
+        spots.push(obj)
         return
       }
       if (obj instanceof PointLight) {
@@ -169,6 +168,14 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
         if (mat.specular) mat.specular.setScalar(0)
         // PSX consoles had no texture filtering.
         if (mat.map) mat.map.magFilter = NearestFilter
+        // Blender exports the color texture again as the transparency
+        // texture, which three reads as an alphaMap (green channel!) — dark
+        // artwork pixels count as transparent. It arrives as a separate
+        // texture instance wrapping the same image, so drop any alphaMap on
+        // color-mapped materials; the color map's real PNG alpha still cuts
+        // out silhouettes. (A dedicated grayscale alpha texture would be
+        // lost — Blender's FBX path doesn't produce those.)
+        if (mat.alphaMap && mat.map) mat.alphaMap = null
         // Alpha textures arrive as blended, which renders cutouts (posters,
         // the standees) ghostly and z-fighty; alpha-tested is crisp.
         if (mat.transparent) {
@@ -179,6 +186,15 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
         setSnapDefine(mat, useStore.getState().psx)
       }
     })
+
+    // Aim spotlights straight down in room space — the fixture's own FBX
+    // rotation must not tilt the beam (a rotated ceiling lamp was firing
+    // its cone up through the roof).
+    for (const spot of spots) {
+      spot.target.position.copy(spot.position)
+      spot.target.position.y -= 1 / unitScale
+      spot.parent?.add(spot.target)
+    }
 
     // A small glowing bulb per lamp so the light source is a visible,
     // grabbable object. Child of the light, so it tags along when carried;
