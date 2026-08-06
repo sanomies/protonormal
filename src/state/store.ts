@@ -40,8 +40,9 @@ export interface AppState {
   panelOpen: boolean
   // Camera field of view in degrees, user-adjustable from the menu.
   fov: number
-  // Retro rendering (low-res + dither + vertex wobble), menu-toggleable.
-  psx: boolean
+  // PSX rendering is always on; this picks the heavier flavor (chunkier
+  // pixels, wobblier verts, coarser color) over the default.
+  psxHeavy: boolean
   // Drive the "E — pick up / put down lamp" hint.
   lampNearby: boolean
   carryingLamp: boolean
@@ -77,7 +78,7 @@ export const useStore = create<AppState>(() => ({
   instrumentReady: false,
   panelOpen: false,
   fov: storedFov(),
-  psx: localStorage.getItem('bp:psx') !== '0',
+  psxHeavy: localStorage.getItem('bp:psx-heavy') === '1',
   lampNearby: false,
   carryingLamp: false,
 }))
@@ -88,9 +89,9 @@ export function setFov(fov: number): void {
   useStore.setState({ fov: clamped })
 }
 
-export function setPsx(psx: boolean): void {
-  localStorage.setItem('bp:psx', psx ? '1' : '0')
-  useStore.setState({ psx })
+export function setPsxHeavy(psxHeavy: boolean): void {
+  localStorage.setItem('bp:psx-heavy', psxHeavy ? '1' : '0')
+  useStore.setState({ psxHeavy })
 }
 
 export function upsertPeer(peer: { id: string; nick: string }): void {

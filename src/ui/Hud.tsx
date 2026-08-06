@@ -1,5 +1,5 @@
 import { getSession } from '../session'
-import { FOV_MAX, FOV_MIN, setFov, setPsx, useStore } from '../state/store'
+import { FOV_MAX, FOV_MIN, setFov, setPsxHeavy, useStore } from '../state/store'
 import { InstrumentPanel } from './InstrumentPanel'
 import { PlayerList } from './PlayerList'
 
@@ -10,7 +10,7 @@ export function Hud(): React.JSX.Element {
   const fov = useStore((s) => s.fov)
   const lampNearby = useStore((s) => s.lampNearby)
   const carryingLamp = useStore((s) => s.carryingLamp)
-  const psx = useStore((s) => s.psx)
+  const psxHeavy = useStore((s) => s.psxHeavy)
 
   return (
     <div className="hud">
@@ -59,8 +59,12 @@ export function Hud(): React.JSX.Element {
           </div>
 
           <label className="check">
-            <input type="checkbox" checked={psx} onChange={(e) => setPsx(e.target.checked)} />
-            PSX filter
+            <input
+              type="checkbox"
+              checked={psxHeavy}
+              onChange={(e) => setPsxHeavy(e.target.checked)}
+            />
+            Extra crunchy PSX
           </label>
 
           <InstrumentPanel />

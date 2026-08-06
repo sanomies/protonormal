@@ -23,13 +23,13 @@ function CameraFov(): null {
 
 export function Scene(): React.JSX.Element {
   const peers = useStore((s) => s.peers)
-  const psx = useStore((s) => s.psx)
+  const psxHeavy = useStore((s) => s.psxHeavy)
   return (
     <Canvas
       shadows
       // Low internal resolution + no AA: the buffer upscales to chunky PSX
       // pixels (styles.css sets image-rendering: pixelated on the canvas).
-      dpr={psx ? 0.5 : [1, 2]}
+      dpr={psxHeavy ? 0.25 : 0.5}
       // AgX is what Blender renders with — soft, desaturating highlight
       // rolloff instead of ACES's hotter look.
       gl={{ antialias: false, toneMapping: AgXToneMapping, toneMappingExposure: 0.9 }}

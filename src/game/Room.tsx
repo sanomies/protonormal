@@ -183,7 +183,7 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
           mat.alphaTest = 0.5
           mat.depthWrite = true
         }
-        setSnapDefine(mat, useStore.getState().psx)
+        setSnapDefine(mat, useStore.getState().psxHeavy)
       }
     })
 

@@ -14,20 +14,23 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { useStore } from '../state/store'
 
-// Snap grid in half-resolution units: NDC [-1,1] × 480 ≈ a 960×720 raster.
-// Patching the shared chunk once catches every built-in material — room,
-// avatars, bulbs — without per-material shader code. The wobble is gated on
-// a USE_PSX_SNAP define per material so the menu toggle can switch it off;
-// PsxVertexSnap below maintains the define. Tiny meshes that would collapse
-// on the coarse grid (the lamp bulbs) opt out permanently with a
-// PSX_NO_SNAP marker define.
+// Snap grid in half-resolution units. PSX wobble is always on; the heavy
+// flavor snaps to a much coarser grid. Patching the shared chunk once
+// catches every built-in material — room, avatars, bulbs — without
+// per-material shader code; per-material defines pick the flavor. Tiny
+// meshes that would collapse on the coarse grid (the lamp bulbs) opt out
+// permanently with a PSX_NO_SNAP marker define.
 if (!ShaderChunk.project_vertex.includes('psxSnap')) {
   ShaderChunk.project_vertex = ShaderChunk.project_vertex.replace(
     'gl_Position = projectionMatrix * mvPosition;',
     `gl_Position = projectionMatrix * mvPosition;
     #ifdef USE_PSX_SNAP
     if (gl_Position.w > 0.0) {
+      #ifdef PSX_SNAP_HEAVY
+      vec2 psxSnap = vec2(240.0, 180.0);
+      #else
       vec2 psxSnap = vec2(480.0, 360.0);
+      #endif
       gl_Position.xyz /= gl_Position.w;
       gl_Position.xy = floor(gl_Position.xy * psxSnap) / psxSnap;
       gl_Position.xyz *= gl_Position.w;
@@ -36,39 +39,41 @@ if (!ShaderChunk.project_vertex.includes('psxSnap')) {
   )
 }
 
-// Adds/removes USE_PSX_SNAP on every material in the scene when the setting
-// flips (a recompile, so only on actual change). Re-runs when peers change
-// so freshly-mounted avatars get stamped too; the room stamps its own
+// Restamps every material's snap defines when the flavor flips (a shader
+// recompile, so only on actual change). Re-runs when peers change so
+// freshly-mounted avatars get stamped too; the room stamps its own
 // materials at load time in Room.tsx.
 export function PsxVertexSnap(): null {
-  const psx = useStore((s) => s.psx)
+  const heavy = useStore((s) => s.psxHeavy)
   const peers = useStore((s) => s.peers)
   const scene = useThree((s) => s.scene)
   useEffect(() => {
     scene.traverse((obj) => {
       if (!(obj instanceof Mesh)) return
       const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]) as Material[]
-      for (const mat of mats) setSnapDefine(mat, psx)
+      for (const mat of mats) setSnapDefine(mat, heavy)
     })
-  }, [scene, psx, peers])
+  }, [scene, heavy, peers])
   return null
 }
 
-export function setSnapDefine(mat: Material, on: boolean): void {
+export function setSnapDefine(mat: Material, heavy: boolean): void {
   if (!mat || mat.defines?.PSX_NO_SNAP !== undefined) return
-  const has = mat.defines?.USE_PSX_SNAP !== undefined
-  if (on === has) return
-  if (on) {
-    mat.defines = { ...mat.defines, USE_PSX_SNAP: '' }
-  } else if (mat.defines) {
-    delete mat.defines.USE_PSX_SNAP
-  }
+  const hasSnap = mat.defines?.USE_PSX_SNAP !== undefined
+  const hasHeavy = mat.defines?.PSX_SNAP_HEAVY !== undefined
+  if (hasSnap && hasHeavy === heavy) return
+  mat.defines = { ...mat.defines, USE_PSX_SNAP: '' }
+  if (heavy) mat.defines.PSX_SNAP_HEAVY = ''
+  else delete mat.defines.PSX_SNAP_HEAVY
   mat.needsUpdate = true
 }
 
 const PsxDitherShader = {
   uniforms: {
     tDiffuse: { value: null },
+    // Quantization levels per channel: 63 (6-bit) default, 31 (PS1's
+    // 15-bit color) for the heavy flavor.
+    uLevels: { value: 63 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -79,6 +84,7 @@ const PsxDitherShader = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
+    uniform float uLevels;
     varying vec2 vUv;
 
     // Ordered 4×4 Bayer pattern without arrays (GLSL ES 1.0 safe).
@@ -90,23 +96,21 @@ const PsxDitherShader = {
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
       float d = bayer2(0.5 * gl_FragCoord.xy) * 0.25 + bayer2(gl_FragCoord.xy);
-      // 6 bits per channel — half as coarse as the PS1's 15-bit color, so
-      // the dither pattern reads as texture rather than dominating.
-      c.rgb = floor(c.rgb * 63.0 + d) / 63.0;
+      c.rgb = floor(c.rgb * uLevels + d) / uLevels;
       gl_FragColor = c;
     }
   `,
 }
 
 // Always-on post chain: render → bloom (in linear HDR, so only genuinely hot
-// spots glow) → tone mapping/sRGB → PSX dither. The dither pass is the only
-// part gated on the PSX setting; bloom and tone mapping apply to both looks.
+// spots glow) → tone mapping/sRGB → PSX dither. The heavy flavor coarsens
+// the dither quantization; everything else is shared.
 export function PostEffects(): null {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
-  const psx = useStore((s) => s.psx)
+  const heavy = useStore((s) => s.psxHeavy)
 
   const { composer, dither } = useMemo(() => {
     const c = new EffectComposer(gl)
@@ -120,8 +124,8 @@ export function PostEffects(): null {
   }, [gl, scene, camera])
 
   useEffect(() => {
-    dither.enabled = psx
-  }, [dither, psx])
+    dither.uniforms.uLevels!.value = heavy ? 31 : 63
+  }, [dither, heavy])
 
   useEffect(() => {
     composer.setPixelRatio(gl.getPixelRatio())
