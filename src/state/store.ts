@@ -46,6 +46,9 @@ export interface AppState {
   // Drive the "E — pick up / put down lamp" hint.
   lampNearby: boolean
   carryingLamp: boolean
+  // Front-door peephole: in reach, and the video overlay showing.
+  peepholeNearby: boolean
+  peepholeOpen: boolean
 }
 
 export const FOV_MIN = 60
@@ -81,6 +84,8 @@ export const useStore = create<AppState>(() => ({
   psxHeavy: localStorage.getItem('bp:psx-heavy') === '1',
   lampNearby: false,
   carryingLamp: false,
+  peepholeNearby: false,
+  peepholeOpen: false,
 }))
 
 export function setFov(fov: number): void {
@@ -138,5 +143,7 @@ export function resetToJoin(error: string | null): void {
     micMuted: false,
     lampNearby: false,
     carryingLamp: false,
+    peepholeNearby: false,
+    peepholeOpen: false,
   })
 }

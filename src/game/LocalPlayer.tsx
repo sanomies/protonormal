@@ -24,6 +24,7 @@ import {
   toggleLamp,
   updateLamps,
 } from './lamps'
+import { peepholeInReach } from './peephole'
 
 const EYE_HEIGHT = 1.6
 const RADIUS = 0.35
@@ -33,6 +34,7 @@ const UP = new Vector3(0, 1, 0)
 const LAMP_REACH = 2
 const CARRY_DIST = 0.7
 const CARRY_DROP = 0.35
+const PEEPHOLE_REACH = 1.4
 
 export function LocalPlayer(): React.JSX.Element {
   const keys = useRef<Record<string, boolean>>({})
@@ -47,10 +49,16 @@ export function LocalPlayer(): React.JSX.Element {
     const down = (e: KeyboardEvent): void => {
       keys.current[e.code] = true
       if (e.code === 'KeyE' && !e.repeat && document.pointerLockElement != null) {
+        if (useStore.getState().peepholeOpen) {
+          useStore.setState({ peepholeOpen: false })
+          return
+        }
         const session = getSession()
         const dropped = dropCarried()
         if (dropped) {
           session?.room.sendLampEvent(dropped.i, dropped.p, false, dropped.on)
+        } else if (peepholeInReach(camera.position.x, camera.position.z, PEEPHOLE_REACH)) {
+          useStore.setState({ peepholeOpen: true })
         } else {
           const near = nearestLampWithin(camera.position.x, camera.position.z, LAMP_REACH)
           if (near >= 0) {
@@ -155,9 +163,15 @@ export function LocalPlayer(): React.JSX.Element {
     const carrying = held >= 0
     const nearby =
       !carrying && nearestLampWithin(camera.position.x, camera.position.z, LAMP_REACH) >= 0
+    const atPeephole =
+      !carrying && peepholeInReach(camera.position.x, camera.position.z, PEEPHOLE_REACH)
     const ui = useStore.getState()
-    if (ui.carryingLamp !== carrying || ui.lampNearby !== nearby) {
-      useStore.setState({ carryingLamp: carrying, lampNearby: nearby })
+    if (
+      ui.carryingLamp !== carrying ||
+      ui.lampNearby !== nearby ||
+      ui.peepholeNearby !== atPeephole
+    ) {
+      useStore.setState({ carryingLamp: carrying, lampNearby: nearby, peepholeNearby: atPeephole })
     }
 
     const session = getSession()
@@ -182,7 +196,11 @@ export function LocalPlayer(): React.JSX.Element {
   return (
     <PointerLockControls
       onLock={() => useStore.setState({ panelOpen: false })}
-      onUnlock={() => useStore.setState({ panelOpen: true })}
+      onUnlock={() => {
+        // Esc while peeping closes the video instead of opening the menu.
+        if (useStore.getState().peepholeOpen) useStore.setState({ peepholeOpen: false })
+        else useStore.setState({ panelOpen: true })
+      }}
     />
   )
 }

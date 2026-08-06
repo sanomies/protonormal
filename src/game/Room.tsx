@@ -17,6 +17,7 @@ import {
 import { useStore } from '../state/store'
 import { setColliders, type AABB } from './collision'
 import { setLamps } from './lamps'
+import { addPeepholeSpot, clearPeepholeSpots } from './peephole'
 import { setSnapDefine } from './PsxEffects'
 
 // Drop your export at src/assets/room.glb or src/assets/room.fbx and it
@@ -247,11 +248,19 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
     const lights: PointLight[] = []
     scene.traverse((obj) => {
       if (obj instanceof PointLight) lights.push(obj)
+      // Every door hosts the peephole interaction.
+      if (obj instanceof Mesh && /^door/i.test(obj.name)) {
+        const b = new Box3().setFromObject(obj)
+        addPeepholeSpot((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2)
+      }
     })
     // Sorted by name so lamp indices agree across every client in the room.
     lights.sort((a, b) => a.name.localeCompare(b.name))
     setLamps(lights)
-    return () => setLamps([])
+    return () => {
+      setLamps([])
+      clearPeepholeSpots()
+    }
   }, [scene])
 
   return <primitive object={scene} />

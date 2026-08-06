@@ -10,6 +10,7 @@ export function Hud(): React.JSX.Element {
   const fov = useStore((s) => s.fov)
   const lampNearby = useStore((s) => s.lampNearby)
   const carryingLamp = useStore((s) => s.carryingLamp)
+  const peepholeNearby = useStore((s) => s.peepholeNearby)
   const psxHeavy = useStore((s) => s.psxHeavy)
 
   return (
@@ -76,9 +77,11 @@ export function Hud(): React.JSX.Element {
         <div className="hud-bottom">
           {carryingLamp
             ? 'E — drop lamp · click — on/off · '
-            : lampNearby
-              ? 'E — pick up lamp · click — on/off · '
-              : ''}
+            : peepholeNearby
+              ? 'E — look through the peephole · '
+              : lampNearby
+                ? 'E — pick up lamp · click — on/off · '
+                : ''}
           Esc — menu & mixer
         </div>
       )}

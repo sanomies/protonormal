@@ -2,6 +2,7 @@ import { Scene } from './game/Scene'
 import { useStore } from './state/store'
 import { Hud } from './ui/Hud'
 import { JoinScreen } from './ui/JoinScreen'
+import { PeepholeOverlay } from './ui/PeepholeOverlay'
 
 export default function App(): React.JSX.Element {
   const phase = useStore((s) => s.phase)
@@ -10,6 +11,7 @@ export default function App(): React.JSX.Element {
     <>
       <Scene />
       <Hud />
+      <PeepholeOverlay />
     </>
   )
 }
