@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>MIDI test</title>
+<body style="font: 14px/1.5 monospace; background: #111; color: #eee; padding: 20px">
+  <p>Standalone Web MIDI check — no app code involved.</p>
+  <button id="go" style="font-size: 16px; padding: 10px 16px">Request MIDI access</button>
+  <pre id="log"></pre>
+  <script>
+    const log = (m) => (document.getElementById('log').textContent += m + '\n')
+    log('userAgent: ' + navigator.userAgent)
+    log('requestMIDIAccess: ' + (navigator.requestMIDIAccess ? 'available' : 'MISSING'))
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'midi', sysex: false })
+        .then((p) => log('permission state: ' + p.state))
+        .catch((e) => log('permission query failed: ' + e))
+    }
+    document.getElementById('go').onclick = async () => {
+      if (!navigator.requestMIDIAccess) return log('Web MIDI NOT supported in this browser')
+      try {
+        log('requesting…')
+        const access = await navigator.requestMIDIAccess({ sysex: false })
+        log('access GRANTED; inputs: ' + access.inputs.size)
+        const attach = () => {
+          for (const input of access.inputs.values()) {
+            log(
+              `port: "${input.name}" [${input.manufacturer}] state=${input.state} connection=${input.connection}`,
+            )
+            input.onmidimessage = (e) =>
+              log(`msg from "${input.name}": [${[...e.data].join(', ')}]`)
+          }
+        }
+        attach()
+        access.onstatechange = (e) => {
+          log(`statechange: ${e.port && e.port.name} → ${e.port && e.port.state}`)
+          attach()
+        }
+        log('now play a key — raw messages should appear below')
+      } catch (e) {
+        log('requestMIDIAccess FAILED: ' + e)
+      }
+    }
+  </script>
+</body>
