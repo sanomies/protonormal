@@ -199,14 +199,18 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
     // A small glowing bulb per lamp so the light source is a visible,
     // grabbable object. Child of the light, so it tags along when carried;
     // it must not cast shadows or it would occlude its own light entirely.
-    // Geometry is sized in model units (centimeters here).
+    // Sized from the light's WORLD scale — fixture lights inherit large
+    // scales from their housing meshes, which the light's own scale reset
+    // doesn't touch.
+    scene.updateMatrixWorld(true)
     for (const light of lights) {
       if (light.children.some((c) => c.name === 'lampBulb')) continue
       const mat = new MeshBasicMaterial({ color: 0xff7a30 })
       // Exempt from PSX vertex snapping — a bulb-sized mesh collapses into
       // jagged streaks on the coarse snap grid.
       mat.defines = { PSX_NO_SNAP: '' }
-      const bulb = new Mesh(new SphereGeometry(9 / (unitScale * 100), 16, 12), mat)
+      const worldScale = light.getWorldScale(new Vector3()).x || 1
+      const bulb = new Mesh(new SphereGeometry(0.09 / worldScale, 16, 12), mat)
       bulb.name = 'lampBulb'
       light.add(bulb)
     }
