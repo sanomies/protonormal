@@ -139,7 +139,7 @@ function FbxRoom({ url }: { url: string }): React.JSX.Element {
         // Small map + wide PCF radius = the soft smudged shadows of an
         // area light, not the razor-edged wedges of a point light.
         obj.shadow.mapSize.set(256, 256)
-        obj.shadow.radius = 14
+        obj.shadow.radius = 22
         obj.shadow.camera.near = 0.1
         obj.shadow.normalBias = 0.08
         lights.push(obj)

@@ -38,7 +38,7 @@ export function Scene(): React.JSX.Element {
       <color attach="background" args={['#0b0b10']} />
       {/* Fog ranges sit inside the 12 m room so haze is visible across it;
           the warm tint keeps it reading as smoke, not darkness. */}
-      <fog attach="fog" args={['#170d07', 2.5, 20]} />
+      <fog attach="fog" args={['#170d07', 1.8, 14]} />
       {/* Whisper of fill standing in for the bounce light Blender gets from
           GI; the room's own lamps carry the lighting. */}
       <ambientLight intensity={0.11} color="#c9805a" />

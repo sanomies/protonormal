@@ -13,7 +13,7 @@ import {
   PlaneGeometry,
 } from 'three'
 
-const COUNT = 14
+const COUNT = 24
 const BOUNDS = 5.2
 
 interface Wisp {
@@ -59,13 +59,13 @@ export function Smoke(): React.JSX.Element {
         color: 0x9a8d82,
         alphaMap: texture,
         transparent: true,
-        opacity: 0.03 + rand(i) * 0.03,
+        opacity: 0.045 + rand(i) * 0.045,
         depthWrite: false,
       })
       const mesh = new Mesh(geometry, material)
-      const scale = 3.5 + rand(i + 40) * 3
+      const scale = 3 + rand(i + 40) * 4
       mesh.scale.setScalar(scale)
-      const baseY = 0.5 + rand(i + 60) * 1.3
+      const baseY = 0.4 + rand(i + 60) * 1.7
       mesh.position.set(
         (rand(i + 10) * 2 - 1) * BOUNDS,
         baseY,

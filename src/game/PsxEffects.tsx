@@ -119,7 +119,8 @@ export function PostEffects(): null {
     const c = new EffectComposer(gl)
     c.addPass(new RenderPass(scene, camera))
     // Threshold ~1: only over-bright surfaces (bulbs, lamp hotspots) bloom.
-    c.addPass(new UnrealBloomPass(new Vector2(256, 256), 0.55, 0.4, 0.85))
+    // Wide radius + lower threshold = a soft halo that smooths the sources.
+    c.addPass(new UnrealBloomPass(new Vector2(256, 256), 0.7, 0.6, 0.75))
     c.addPass(new OutputPass())
     const dither = new ShaderPass(PsxDitherShader)
     c.addPass(dither)

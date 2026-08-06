@@ -62,11 +62,14 @@ export function setLamps(lights: PointLight[]): void {
   // Replay state that arrived while the model was still loading. Released
   // lamps get a zero-velocity fall: if they're already resting on their
   // support (floor or furniture) it lands immediately, otherwise it settles.
+  // Mounted fixtures and pure sources only ever replay their on/off state —
+  // their position is authored, not networked.
   for (const [i, s] of known) {
     const lamp = lamps[i]
     if (!lamp) continue
-    setWorldPos(lamp, s.p[0], s.p[1], s.p[2])
     applyOn(lamp, s.on)
+    if (lamp.fixed || lamp.ghost) continue
+    setWorldPos(lamp, s.p[0], s.p[1], s.p[2])
     if (!s.held) lamp.fallVel = 0
   }
 }
@@ -185,6 +188,9 @@ export function applyRemoteLamp(i: number, p: Vec3, held: boolean, on: boolean):
   const lamp = lamps[i]
   if (!lamp) return
   applyOn(lamp, on)
+  // Mounted fixtures and pure sources never move — a toggle event carries
+  // held:false, which must not read as "released, let it fall".
+  if (lamp.fixed || lamp.ghost) return
   if (held) {
     // Carried by a peer: ease toward the streamed position.
     lamp.fallVel = null
