@@ -24,6 +24,9 @@ interface LampEntry {
   // Vertical velocity while falling, null when at rest or held.
   fallVel: number | null
   on: boolean
+  // Mounted fixtures (ceiling/wall lamps) can be toggled but not carried —
+  // taking the light while its housing stays on the wall looks broken.
+  fixed: boolean
 }
 
 const GRAVITY = 9.8
@@ -46,7 +49,11 @@ const known = new Map<number, { p: Vec3; held: boolean; on: boolean }>()
 const tmp = new Vector3()
 
 export function setLamps(lights: PointLight[]): void {
-  lamps = lights.map((light) => ({ light, remoteTarget: null, fallVel: null, on: true }))
+  lamps = lights.map((light) => {
+    light.getWorldPosition(tmp)
+    const fixed = tmp.y > 2 || (light.parent as Mesh | null)?.isMesh === true
+    return { light, remoteTarget: null, fallVel: null, on: true, fixed }
+  })
   carried = -1
   // Replay state that arrived while the model was still loading. Released
   // lamps get a zero-velocity fall: if they're already resting on their
@@ -83,10 +90,12 @@ export function lampWorldPos(i: number): Vec3 | null {
   return [round3(tmp.x), round3(tmp.y), round3(tmp.z)]
 }
 
+// Nearest carryable lamp (fixtures excluded — they only respond to clicks).
 export function nearestLampWithin(x: number, z: number, radius: number): number {
   let best = -1
   let bestD = radius * radius
   for (let i = 0; i < lamps.length; i++) {
+    if (lamps[i]!.fixed) continue
     lamps[i]!.light.getWorldPosition(tmp)
     const dx = tmp.x - x
     const dz = tmp.z - z
