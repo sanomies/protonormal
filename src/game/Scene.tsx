@@ -3,9 +3,10 @@ import { Suspense, useEffect } from 'react'
 import { AgXToneMapping, PerspectiveCamera } from 'three'
 import { useStore } from '../state/store'
 import { LocalPlayer } from './LocalPlayer'
-import { PsxEffects, PsxVertexSnap } from './PsxEffects'
+import { PostEffects, PsxVertexSnap } from './PsxEffects'
 import { RemoteAvatar } from './RemoteAvatar'
 import { Room } from './Room'
+import { Smoke } from './Smoke'
 
 // The Canvas camera prop is initial-only; this applies menu changes live.
 function CameraFov(): null {
@@ -43,9 +44,10 @@ export function Scene(): React.JSX.Element {
       <ambientLight intensity={0.11} color="#c9805a" />
       <CameraFov />
       <PsxVertexSnap />
-      {psx && <PsxEffects />}
+      <PostEffects />
       <Suspense fallback={null}>
         <Room />
+        <Smoke />
         <LocalPlayer />
         {Object.values(peers).map((peer) => (
           <RemoteAvatar key={peer.id} peer={peer} />

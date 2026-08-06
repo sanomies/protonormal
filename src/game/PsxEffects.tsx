@@ -6,11 +6,12 @@
 
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo } from 'react'
-import { Mesh, ShaderChunk, type Material } from 'three'
+import { Mesh, ShaderChunk, Vector2, type Material } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { useStore } from '../state/store'
 
 // Snap grid in half-resolution units: NDC [-1,1] × 480 ≈ a 960×720 raster.
@@ -97,19 +98,30 @@ const PsxDitherShader = {
   `,
 }
 
-export function PsxEffects(): null {
+// Always-on post chain: render → bloom (in linear HDR, so only genuinely hot
+// spots glow) → tone mapping/sRGB → PSX dither. The dither pass is the only
+// part gated on the PSX setting; bloom and tone mapping apply to both looks.
+export function PostEffects(): null {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
+  const psx = useStore((s) => s.psx)
 
-  const composer = useMemo(() => {
+  const { composer, dither } = useMemo(() => {
     const c = new EffectComposer(gl)
     c.addPass(new RenderPass(scene, camera))
+    // Threshold ~1: only over-bright surfaces (bulbs, lamp hotspots) bloom.
+    c.addPass(new UnrealBloomPass(new Vector2(256, 256), 0.55, 0.4, 0.85))
     c.addPass(new OutputPass())
-    c.addPass(new ShaderPass(PsxDitherShader))
-    return c
+    const dither = new ShaderPass(PsxDitherShader)
+    c.addPass(dither)
+    return { composer: c, dither }
   }, [gl, scene, camera])
+
+  useEffect(() => {
+    dither.enabled = psx
+  }, [dither, psx])
 
   useEffect(() => {
     composer.setPixelRatio(gl.getPixelRatio())
