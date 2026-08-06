@@ -26,18 +26,75 @@ interface Wisp {
   baseOpacity: number
 }
 
-function makeBlobTexture(): CanvasTexture {
+// FBM value noise — turbulent interiors and irregular silhouettes are what
+// separate smoke from "transparent circles" (standard procedural-cloud
+// technique: noise-distorted boundary × fractal interior).
+function hash2(x: number, y: number, seed: number): number {
+  const v = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453
+  return v - Math.floor(v)
+}
+
+function valueNoise(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x)
+  const yi = Math.floor(y)
+  const xf = x - xi
+  const yf = y - yi
+  const sx = xf * xf * (3 - 2 * xf)
+  const sy = yf * yf * (3 - 2 * yf)
+  const a = hash2(xi, yi, seed)
+  const b = hash2(xi + 1, yi, seed)
+  const c = hash2(xi, yi + 1, seed)
+  const d = hash2(xi + 1, yi + 1, seed)
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
+}
+
+function fbm(x: number, y: number, seed: number): number {
+  let amp = 0.5
+  let freq = 1
+  let sum = 0
+  for (let o = 0; o < 4; o++) {
+    sum += amp * valueNoise(x * freq, y * freq, seed + o * 13.7)
+    amp *= 0.5
+    freq *= 2
+  }
+  return sum
+}
+
+const smoothstep = (e0: number, e1: number, v: number): number => {
+  const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0)))
+  return t * t * (3 - 2 * t)
+}
+
+function makeSmokeTexture(seed: number): CanvasTexture {
   const size = 128
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')!
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  g.addColorStop(0, 'rgba(255,255,255,0.35)')
-  g.addColorStop(0.5, 'rgba(255,255,255,0.16)')
-  g.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, size, size)
+  const img = ctx.createImageData(size, size)
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const u = (px / size) * 2 - 1
+      const v = (py / size) * 2 - 1
+      const r = Math.hypot(u, v)
+      // Noise-wobbled boundary radius — kills the circular silhouette.
+      // Sampling in (cos, sin) space keeps it seamless around the rim.
+      const cs = r > 1e-5 ? u / r : 1
+      const sn = r > 1e-5 ? v / r : 0
+      const edge = fbm(cs * 1.6 + seed, sn * 1.6 + seed * 1.3, seed)
+      const radius = 0.5 + 0.4 * edge
+      const mask = smoothstep(radius, radius * 0.35, r)
+      // Turbulent interior, leveled so it has real structure.
+      const body = smoothstep(0.32, 0.78, fbm(u * 2.4 + seed * 2.1, v * 2.4 + seed * 3.7, seed + 5))
+      const alpha = mask * (0.25 + 0.75 * body)
+      const i = (py * size + px) * 4
+      img.data[i] = 255
+      img.data[i + 1] = Math.round(alpha * 255)
+      img.data[i + 2] = 255
+      img.data[i + 3] = 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
   return new CanvasTexture(canvas)
 }
 
@@ -52,14 +109,15 @@ export function Smoke(): React.JSX.Element {
   const camera = useThree((s) => s.camera)
 
   const wisps = useMemo<Wisp[]>(() => {
-    const texture = makeBlobTexture()
+    // A few baked variants so neighboring puffs never look identical.
+    const textures = [1, 2, 3, 4, 5].map((s) => makeSmokeTexture(s * 17.31))
     const geometry = new PlaneGeometry(1, 1)
     return Array.from({ length: COUNT }, (_, i) => {
       // Dim tint keeps even lamp-adjacent wisps below the bloom threshold.
-      const baseOpacity = 0.045 + rand(i) * 0.045
+      const baseOpacity = 0.055 + rand(i) * 0.05
       const material = new MeshLambertMaterial({
         color: 0x9a8d82,
-        alphaMap: texture,
+        alphaMap: textures[Math.floor(rand(i + 50) * textures.length)]!,
         transparent: true,
         opacity: baseOpacity,
         depthWrite: false,
