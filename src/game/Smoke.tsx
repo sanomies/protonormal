@@ -13,7 +13,7 @@ import {
   PlaneGeometry,
 } from 'three'
 
-const COUNT = 24
+const COUNT = 44
 const BOUNDS = 5.2
 
 interface Wisp {
@@ -23,6 +23,7 @@ interface Wisp {
   spin: number
   bobPhase: number
   baseY: number
+  baseOpacity: number
 }
 
 function makeBlobTexture(): CanvasTexture {
@@ -32,8 +33,8 @@ function makeBlobTexture(): CanvasTexture {
   canvas.height = size
   const ctx = canvas.getContext('2d')!
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  g.addColorStop(0, 'rgba(255,255,255,0.55)')
-  g.addColorStop(0.45, 'rgba(255,255,255,0.22)')
+  g.addColorStop(0, 'rgba(255,255,255,0.35)')
+  g.addColorStop(0.5, 'rgba(255,255,255,0.16)')
   g.addColorStop(1, 'rgba(255,255,255,0)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, size, size)
@@ -55,15 +56,17 @@ export function Smoke(): React.JSX.Element {
     const geometry = new PlaneGeometry(1, 1)
     return Array.from({ length: COUNT }, (_, i) => {
       // Dim tint keeps even lamp-adjacent wisps below the bloom threshold.
+      const baseOpacity = 0.045 + rand(i) * 0.045
       const material = new MeshLambertMaterial({
         color: 0x9a8d82,
         alphaMap: texture,
         transparent: true,
-        opacity: 0.045 + rand(i) * 0.045,
+        opacity: baseOpacity,
         depthWrite: false,
       })
       const mesh = new Mesh(geometry, material)
-      const scale = 3 + rand(i + 40) * 4
+      // Small overlapping puffs read as a haze layer, not visible discs.
+      const scale = 1.3 + rand(i + 40) * 1.8
       mesh.scale.setScalar(scale)
       const baseY = 0.4 + rand(i + 60) * 1.7
       mesh.position.set(
@@ -78,6 +81,7 @@ export function Smoke(): React.JSX.Element {
         spin: (rand(i + 90) - 0.5) * 0.1,
         bobPhase: rand(i + 30) * Math.PI * 2,
         baseY,
+        baseOpacity,
       }
     })
   }, [])
@@ -97,6 +101,14 @@ export function Smoke(): React.JSX.Element {
       // Billboard with a slow roll.
       w.mesh.quaternion.copy(camera.quaternion)
       w.mesh.rotateZ(t * w.spin)
+      // Fade out wisps that drift onto the camera so they never blanket
+      // the whole view.
+      const dist = camera.position.distanceTo(p)
+      const fade = Math.min(1, Math.max(0, (dist - 0.6) / 1.6))
+      const mat = w.mesh.material as MeshLambertMaterial
+      if (Math.abs(mat.opacity - w.baseOpacity * fade) > 0.002) {
+        mat.opacity = w.baseOpacity * fade
+      }
     }
   })
 
